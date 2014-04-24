@@ -32,6 +32,8 @@
 # if the events are getting garbled or just returning no events, and you're not
 # on x86 land.. well..
 
+import os
+import fnmatch
 import csv
 import time
 from glob import glob
@@ -150,10 +152,13 @@ def dump_cef(fileList, to_json=False, limit_to=[]):
         fdat = pair[0]
         fcsv = pair[1]
         f = open(fdat)
-        for chunk in get_metadata(open(fcsv)):
+	system('/bin/gunzip %s 2>/dev/null' % fcsv)	
+	fcsv2=fcsv[0:-3]
+        for chunk in get_metadata(open(fcsv2)):
             # notice('starting chunk', chunk['ChunkId'])
             gz_str = slice(f, int(chunk['BeginOffset']), int(chunk['Length']))
             parse_chunk(gz_str, to_json, limit_to=limit_to)
+	system('/bin/gzip %s 2>/dev/null' % fcsv2)
 
 if __name__ == '__main__':
     usage = """%prog [options] path_to_dat path_to_meta
@@ -185,13 +190,20 @@ Why is it called lacat?
     # ArcSight_Metadata_46_504403158265495552.csv
     if options.directory:
         # user wants to scan through an entire directory
-        csvFiles = glob(options.directory[0] + '*.csv')  # creates list of csv files
+        #csvFiles = glob(options.directory[0] + '*.csv')  # creates list of csv files
+
+	csvFiles = []
+	for root, dirnames, filenames in os.walk(options.directory[0]):
+  	    for filename in fnmatch.filter(filenames, '*.csv.gz'):
+     	       csvFiles.append(os.path.join(root, filename))
+	#print csvFiles 
+
         fileList = []
         for csvFile in csvFiles:
-            datFinder = path.basename(csvFile)[18:-4].split('_')  # returns list of significant digits
+            datFinder = path.basename(csvFile)[18:-7].split('_')  # returns list of significant digits
             # ArcSight_Metadata_46_504403158265495552.csv = ['46', '504403158265495552']
             # we need the significant digits because the archive loggers sometimes pad with extra zero
-            datFile = (glob(options.directory[0] + '*_' + datFinder[0] + '_*' + datFinder[1] + '*.dat'))
+            datFile = (glob(path.dirname(csvFile) + '/*_' + datFinder[0] + '_*' + datFinder[1] + '*.dat'))
             # datFile returns list of single file matching the csv significant digits
             fileList.append((datFile[0], csvFile))  # nice list of (CSV,DAT) tuples
 
